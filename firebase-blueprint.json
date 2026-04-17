@@ -1,0 +1,42 @@
+{
+  "entities": {
+    "Alert": {
+      "title": "Stock Alert",
+      "description": "User-defined criteria for stock monitoring.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner User ID" },
+        "ticker": { "type": "string", "description": "Stock Symbol" },
+        "criteria_type": { "type": "string", "enum": ["SCORE", "PRICE_ABOVE", "PRICE_BELOW"] },
+        "threshold": { "type": "number", "description": "Threshold value" },
+        "isActive": { "type": "boolean", "description": "Status of the alert" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "ticker", "criteria_type", "threshold", "isActive"]
+    },
+    "Notification": {
+      "title": "Alert Notification",
+      "description": "Triggered alert logs.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "User ID to notify" },
+        "alertId": { "type": "string", "description": "Source Alert ID" },
+        "ticker": { "type": "string" },
+        "message": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "isRead": { "type": "boolean" }
+      },
+      "required": ["uid", "ticker", "message", "timestamp", "isRead"]
+    }
+  },
+  "firestore": {
+    "/alerts/{alertId}": {
+      "schema": "Alert",
+      "description": "User alert configurations."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "Triggered notifications."
+    }
+  }
+}

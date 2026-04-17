@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: alerts
+    // Document ID: auto-generated
+    // Fields:
+    //   - uid: string (required) - Owner UID
+    //   - ticker: string (required) - Stock Ticker
+    //   - criteria_type: string (required, ['SCORE', 'PRICE_ABOVE', 'PRICE_BELOW'])
+    //   - threshold: number (required)
+    //   - isActive: bool (required)
+    //   - createdAt: timestamp (optional)
+    //
+    // Collection: notifications
+    // Document ID: auto-generated
+    // Fields:
+    //   - uid: string (required) - Recipient UID
+    //   - ticker: string (required)
+    //   - message: string (required)
+    //   - timestamp: timestamp (required)
+    //   - isRead: bool (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "tomrider8040@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidAlert(data) {
+      return data.keys().hasAll(['uid', 'ticker', 'criteria_type', 'threshold', 'isActive']) &&
+             data.uid is string &&
+             data.ticker is string && data.ticker.size() > 0 && data.ticker.size() < 10 &&
+             data.criteria_type in ['SCORE', 'PRICE_ABOVE', 'PRICE_BELOW'] &&
+             data.threshold is number &&
+             data.isActive is bool;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['uid', 'ticker', 'message', 'timestamp', 'isRead']) &&
+             data.uid is string &&
+             data.ticker is string &&
+             data.message is string && data.message.size() < 1000 &&
+             data.timestamp is timestamp &&
+             data.isRead is bool;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /alerts/{alertId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAuthenticated() && isValidAlert(request.resource.data) && (request.resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isDocOwner() && isValidAlert(request.resource.data) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isAdmin(); // Usually created by a backend or admin trigger
+      allow update: if isDocOwner() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+    }
+
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
